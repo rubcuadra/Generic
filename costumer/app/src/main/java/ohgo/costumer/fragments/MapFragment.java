@@ -47,7 +47,10 @@ public class MapFragment extends Fragment
 
     Bundle mBundle;
     LatLng myPosition;
+
     boolean initPos = true;
+    int jobs ;
+
     ImageView mNewWork;
 
     public MapFragment(){}
@@ -79,9 +82,9 @@ public class MapFragment extends Fragment
         View rootView = inflater.inflate(R.layout.fragment_map, container, false);
 
         setUpMapIfNeeded();
+        ObtainServicesFromUser(ParseUser.getCurrentUser());
         mNewWork = (ImageView) rootView.findViewById(R.id.confirm);
         mMap.setMyLocationEnabled(true);
-
 
         mMap.setOnMyLocationChangeListener(new GoogleMap.OnMyLocationChangeListener() {
             @Override
@@ -95,18 +98,19 @@ public class MapFragment extends Fragment
 
         mNewWork.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void onClick(View v) {
-                if (initPos == false) {
+            public void onClick(View v)
+            {
+                if (initPos == false && jobs<1) //If we have user position as well he has not exceed the jobs allowed
+                {
                     double lat = mMap.getCameraPosition().target.latitude;
                     double lng = mMap.getCameraPosition().target.longitude;
-                    mMap.addMarker(new MarkerOptions().position(new LatLng(lat, lng)).title("This is your new job"));
+                    ++jobs;
                     CreateService(lat, lng);
+                    mMap.addMarker(new MarkerOptions().position(new LatLng(lat, lng)).title("This is your new job"));
                     //sendPush(lat, lng);
                 }
             }
         });
-        ObtainServicesFromUser(ParseUser.getCurrentUser());
-        //mMap.getCameraPosition().target
         return rootView;
     }
 
@@ -114,6 +118,7 @@ public class MapFragment extends Fragment
     {
         Service trabajo = new Service();
         trabajo.setlocEnd(lat, lng);
+        trabajo.setStatus(0); //Status 0 means Pending, 1 in Progress, 2 Done;
 
         ParseRelation relation = trabajo.getUserRelation();
         relation.add(ParseUser.getCurrentUser());
@@ -130,25 +135,24 @@ public class MapFragment extends Fragment
     private void ObtainServicesFromUser(ParseUser user)
     {
         ParseQuery<Service> services = ParseQuery.getQuery("Service");
-        services.whereEqualTo("userId",user);
-        services.findInBackground(new FindCallback<Service>()
-        {
+        services.whereEqualTo("userId", user);
+        services.findInBackground(new FindCallback<Service>() {
             @Override
-            public void done(List<Service> list, ParseException e)
-            {
+            public void done(List<Service> list, ParseException e) {
                 if (e == null)
                 {
-                    for (int i = 0; i < list.size(); ++i)
+                    jobs = list.size();
+                    if (jobs==1) //You can modify if you want that user only have 1 job or < 5, etc
                     {
-                        ParseGeoPoint currentServiceLocation = list.get(i).getlocEnd();
-
                         mMap.addMarker(new MarkerOptions()
-                                .position(new LatLng(currentServiceLocation.getLatitude(),currentServiceLocation.getLongitude())))
-                                .setTitle("Job # " + i);
+                                .position(new LatLng(list.get(0).getlocEnd().getLatitude(), list.get(0).getlocEnd().getLongitude())))
+                                .setTitle("Your job ");
+                    } else
+                    {
+                        Log.d("Parse", "User has " + jobs + " jobs pending");
                     }
-                } else
-                {
-                    Log.wtf("Parse","ERROR ON OBTAIN-SERVICE-FROM-USER");
+                } else {
+                    Log.wtf("Parse", "ERROR ON OBTAIN-SERVICE-FROM-USER");
                 }
             }
         });
